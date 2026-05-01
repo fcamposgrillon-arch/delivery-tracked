@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍔 Delivery Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a0a;
+    color: #f0f0f0;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container { max-width: 420px; margin: 0 auto; }
+  h1 { text-align: center; font-size: 1.4rem; margin-bottom: 6px; color: #e8b4f0; }
+  .subtitle { text-align: center; font-size: 0.8rem; color: #888; margin-bottom: 24px; }
+
+  .budget-card {
+    background: #161616;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid #2a2a2a;
+  }
+  .budget-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .budget-amount { font-size: 2rem; font-weight: 700; color: #fff; }
+  .budget-amount.spent { color: #ff6b6b; }
+  .budget-amount.warning { color: #ffd166; }
+  .budget-amount.safe { color: #06d6a0; }
+
+  .bar-container {
+    background: #222;
+    border-radius: 12px;
+    height: 28px;
+    overflow: hidden;
+    margin: 16px 0 8px;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 12px;
+    transition: width 0.5s ease, background 0.5s ease;
+    min-width: 0%;
+  }
+  .bar-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+
+  .stats-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  .stat { text-align: center; }
+  .stat-val { font-size: 1.1rem; font-weight: 600; }
+  .stat-label { font-size: 0.65rem; color: #777; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .add-form { display: flex; gap: 8px; margin-top: 4px; }
+  .add-form input {
+    flex: 1;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #fff;
+    font-size: 0.9rem;
+    outline: none;
+  }
+  .add-form input:focus { border-color: #e8b4f0; }
+  .add-form input::placeholder { color: #555; }
+  .add-btn {
+    background: #e8b4f0;
+    color: #0a0a0a;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .add-btn:hover { opacity: 0.85; }
+
+  .history { margin-top: 8px; }
+  .history-title { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #1e1e1e;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-desc { font-size: 0.85rem; }
+  .history-amount { font-size: 0.85rem; font-weight: 600; color: #ff6b6b; }
+  .history-date { font-size: 0.65rem; color: #555; }
+  .delete-btn {
+    background: none;
+    border: none;
+    color: #444;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 6px;
+    margin-left: 8px;
+  }
+  .delete-btn:hover { color: #ff6b6b; }
+
+  .empty-state { text-align: center; color: #444; font-size: 0.8rem; padding: 16px 0; }
+
+  .reset-btn {
+    width: 100%;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 12px;
+    color: #888;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: all 0.2s;
+  }
+  .reset-btn:hover { background: #2a2a2a; color: #e8b4f0; border-color: #e8b4f0; }
+
+  .alert-box {
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 0.8rem;
+    text-align: center;
+    display: none;
+  }
+  .alert-warn { background: #2a1f00; border: 1px solid #664400; color: #ffd166; }
+  .alert-danger { background: #2a0000; border: 1px solid #660000; color: #ff6b6b; }
+  .alert-ok { background: #002a1a; border: 1px solid #006644; color: #06d6a0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🍔 Delivery Tracker</h1>
+  <p class="subtitle">Cupo mensual: Paraguay Guaraníes</p>
+
+  <div id="alertBox" class="alert-box"></div>
+
+  <div class="budget-card">
+    <div class="budget-label">Presupuesto total</div>
+    <div class="budget-amount safe" id="totalBudget">₲ 900.000</div>
+
+    <div class="bar-container">
+      <div class="bar-fill" id="barFill" style="width: 0%; background: #06d6a0;"></div>
+      <span class="bar-text" id="barText">0% usado</span>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-val" id="spentVal" style="color:#ff6b6b">₲ 0</div>
+        <div class="stat-label">Gastado</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="remainVal" style="color:#06d6a0">₲ 900.000</div>
+        <div class="stat-label">Disponible</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="countVal" style="color:#e8b4f0">0</div>
+        <div class="stat-label">Pedidos</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="budget-card">
+    <div class="budget-label">Agregar pedido</div>
+    <div class="add-form">
+      <input type="text" id="descInput" placeholder="Ej: PedidoYa - Burger" maxlength="40">
+      <input type="number" id="amountInput" placeholder="Monto ₲" min="0" style="max-width:140px">
+      <button class="add-btn" onclick="addExpense()">+</button>
+    </div>
+  </div>
+
+  <div class="budget-card history">
+    <div class="history-title">📋 Historial</div>
+    <div id="historyList"><div class="empty-state">Sin pedidos todavía</div></div>
+    <button class="reset-btn" onclick="resetAll()">🔄 Reiniciar mes</button>
+  </div>
+</div>
+
+<script>
+const BUDGET = 900000;
+const STORAGE_KEY = 'delivery_tracker_data';
+
+let expenses = [];
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) expenses = JSON.parse(raw);
+  } catch(e) { expenses = []; }
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+}
+
+function fmt(n) {
+  return '₲ ' + n.toLocaleString('es-PY');
+}
+
+function addExpense() {
+  const desc = document.getElementById('descInput').value.trim() || 'Pedido';
+  const amount = parseInt(document.getElementById('amountInput').value);
+  if (!amount || amount <= 0) return;
+
+  expenses.unshift({
+    desc,
+    amount,
+    date: new Date().toLocaleString('es-PY', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+  });
+  save();
+  document.getElementById('descInput').value = '';
+  document.getElementById('amountInput').value = '';
+  render();
+}
+
+function deleteExpense(i) {
+  expenses.splice(i, 1);
+  save();
+  render();
+}
+
+function resetAll() {
+  if (confirm('¿Borrar todo el historial? Esto reinicia el mes.')) {
+    expenses = [];
+    save();
+    render();
+  }
+}
+
+function getAlert(pct) {
+  const box = document.getElementById('alertBox');
+  if (pct >= 100) {
+    box.className = 'alert-box alert-danger';
+    box.innerHTML = '🚨 CUPOT AGOTENTADO — Se acabó el delivery este mes';
+    box.style.display = 'block';
+  } else if (pct >= 90) {
+    box.className = 'alert-box alert-danger';
+    box.innerHTML = '⚠️ Modo estricto — Solo lo esencial';
+    box.style.display = 'block';
+  } else if (pct >= 80) {
+    box.className = 'alert-box alert-warn';
+    box.innerHTML = '⚠️ Cuidado — 80% del cupo usado';
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+function render() {
+  const spent = expenses.reduce((s, e) => s + e.amount, 0);
+  const remain = Math.max(0, BUDGET - spent);
+  const pct = Math.min(100, Math.round((spent / BUDGET) * 100));
+
+  // Budget amount color
+  const totalEl = document.getElementById('totalBudget');
+  totalEl.textContent = fmt(BUDGET);
+  totalEl.className = 'budget-amount ' + (pct >= 90 ? 'spent' : pct >= 75 ? 'warning' : 'safe');
+
+  // Bar
+  const bar = document.getElementById('barFill');
+  bar.style.width = pct + '%';
+  bar.style.background = pct >= 90 ? '#ff6b6b' : pct >= 75 ? '#ffd166' : '#06d6a0';
+  document.getElementById('barText').textContent = pct + '% usado';
+
+  // Stats
+  document.getElementById('spentVal').textContent = fmt(spent);
+  document.getElementById('remainVal').textContent = fmt(remain);
+  document.getElementById('remainVal').style.color = remain > 200000 ? '#06d6a0' : remain > 0 ? '#ffd166' : '#ff6b6b';
+  document.getElementById('countVal').textContent = expenses.length;
+
+  // Alert
+  getAlert(pct);
+
+  // History
+  const list = document.getElementById('historyList');
+  if (expenses.length === 0) {
+    list.innerHTML = '<div class="empty-state">Sin pedidos todavía</div>';
+  } else {
+    list.innerHTML = expenses.map((e, i) =>
+      `<div class="history-item">
+        <div>
+          <div class="history-desc">${e.desc}</div>
+          <div class="history-date">${e.date}</div>
+        </div>
+        <div style="display:flex;align-items:center">
+          <span class="history-amount">-${fmt(e.amount)}</span>
+          <button class="delete-btn" onclick="deleteExpense(${i})">✕</button>
+        </div>
+      </div>`
+    ).join('');
+  }
+}
+
+load();
+render();
+
+// Enter key support
+document.getElementById('amountInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') addExpense();
+});
+</script>
+</body>
+</html>
