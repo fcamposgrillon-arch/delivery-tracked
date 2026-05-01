@@ -118,6 +118,11 @@
     <div class="history-title">📋 Historial</div>
     <div id="historyList"><div class="empty">Sin pedidos todavía</div></div>
     <button class="btn btn-reset" onclick="resetAll()">🔄 Reiniciar mes</button>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button class="btn btn-reset" onclick="exportData()" style="font-size:0.7rem;padding:6px">💾 Backup</button>
+      <button class="btn btn-reset" onclick="document.getElementById('impFile').click()" style="font-size:0.7rem;padding:6px">📂 Restaurar</button>
+      <input type="file" id="impFile" accept=".json" style="display:none" onclick="importData(event)">
+    </div>
   </div>
 </div>
 <script>
@@ -186,6 +191,16 @@ function dbClear(){
 async function init(){
   try{
     await openDB();
+    // Auto-reset if month changed
+    var currentMonth=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+    var savedMonth=localStorage.getItem('dt_month');
+    if(savedMonth!==currentMonth){
+      localStorage.setItem('dt_month',currentMonth);
+      await dbClear();
+      expenses=[];
+      render();
+      return;
+    }
     const rows=await dbGetAll();
     expenses=rows.sort((a,b)=>b.ts-a.ts);
   }catch(e){
@@ -310,6 +325,49 @@ function render(){
 }
 
 document.getElementById('amtInput').addEventListener('keydown',function(e){if(e.key==='Enter')addExpense();});
+
+
+// --- Export / Import ---
+function exportData(){
+  var data={expenses:expenses,exportedAt:new Date().toISOString()};
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='delivery-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importData(event){
+  var file=event.target.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=JSON.parse(e.target.result);
+      if(data.expenses&&Array.isArray(data.expenses)){
+        // Re-assign IDs from IndexedDB
+        expenses=data.expenses.sort(function(a,b){return b.ts-a.ts;});
+        render();
+        // Re-save all to IDB
+        if(db){
+          dbClear().then(function(){
+            var tx=db.transaction('expenses','readwrite');
+            var store=tx.objectStore('expenses');
+            expenses.forEach(function(item){store.add(item);});
+          });
+        }
+        alert('✅ Restaurados '+expenses.length+' pedidos');
+      }else{
+        alert('❌ Archivo no válido');
+      }
+    }catch(err){
+      alert('❌ Error al leer el archivo: '+err);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value='';
+}
 
 // Start
 init();
